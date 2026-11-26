@@ -25,6 +25,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import tempfile
 import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -54,9 +55,20 @@ def naive_bps(src, tgt):
 
 
 def main():
+    """Each run works in a folder of its own under build/ (removed afterwards), and patch.py
+    compiles there too (FFTA2_BUILD_DIR), so releases or builds running at the same time in
+    other sessions can't delete or overwrite each other's files."""
+    os.makedirs(os.path.join(ROOT, "build"), exist_ok=True)
+    work = tempfile.mkdtemp(prefix="release-", dir=os.path.join(ROOT, "build"))
+    os.environ["FFTA2_BUILD_DIR"] = work            # inherited by the patch.py runs
+    try:
+        release(work)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def release(work):
     out = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "dist", "release"))
-    work = os.path.join(ROOT, "build", "release")
-    os.makedirs(work, exist_ok=True)
     src = open(ROM, "rb").read()
     files, mods, failed = [], {}, []
     art = os.path.join(ROOT, "work", "map_art", "map_art.lz")
@@ -108,20 +120,26 @@ def main():
     if failed:
         sys.exit("RELEASE REFUSED:\n  " + "\n  ".join(failed))
 
-    if os.path.isdir(out):
-        shutil.rmtree(out)
-    os.makedirs(out)
+    # written to a folder of this run's, then swapped in whole: OUTDIR never mixes two runs' files
+    stage = os.path.join(work, "out")
+    os.makedirs(stage)
     sums = []
     for path in files:
-        dest = os.path.join(out, os.path.basename(path))
+        dest = os.path.join(stage, os.path.basename(path))
         shutil.copyfile(path, dest)
         sums.append("%s  %s" % (hashlib.sha256(open(dest, "rb").read()).hexdigest(), os.path.basename(dest)))
-    open(os.path.join(out, "SHA256SUMS"), "w").write("\n".join(sums) + "\n")
-    open(os.path.join(out, "ROM.txt"), "w").write(
+    open(os.path.join(stage, "SHA256SUMS"), "w").write("\n".join(sums) + "\n")
+    open(os.path.join(stage, "ROM.txt"), "w").write(
         "The .bps patches apply to this ROM only (Final Fantasy Tactics A2: Grimoire of the Rift, USA):\n"
         "  size   %d bytes\n  CRC32  %08X\n  SHA-1  %s\n"
         "For a ROM that other mods have changed, use %s-patcher.py instead.\n"
         % (len(src), zlib.crc32(src), hashlib.sha1(src).hexdigest(), NAME))
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    old = out + ".old-%d" % os.getpid()
+    if os.path.isdir(out):
+        os.rename(out, old)
+    shutil.move(stage, out)
+    shutil.rmtree(old, ignore_errors=True)
     print("release files in %s:" % os.path.relpath(out, ROOT))
     for name in sorted(os.listdir(out)):
         print("  %-30s %7d bytes" % (name, os.path.getsize(os.path.join(out, name))))

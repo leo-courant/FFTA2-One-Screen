@@ -39,7 +39,7 @@ static const short map_art_piece[MAP_ART_PIECES][6] = {
 };
 
 __asm__(".section .rodata\n.balign 4\nmap_art_lz:\n"
-        ".incbin \"build/map_art.lz\"\n.text\n");
+        ".incbin \"map_art.lz\"\n.text\n");   /* from the build folder: patch.py compiles there */
 extern const u8 map_art_lz[];
 
 #define MAP_ART_ADDR    0x26000

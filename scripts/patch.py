@@ -103,15 +103,21 @@ def margins(vw, vh):
     return side, vert
 
 
+def build_dir():
+    """Where the compile happens: build/, or FFTA2_BUILD_DIR (make_release.py gives each run its
+    own, so builds running at the same time don't overwrite each other's hook.elf or art)."""
+    return os.path.abspath(os.environ.get("FFTA2_BUILD_DIR") or os.path.join(ROOT, "build"))
+
+
 def build_blob(defines):
-    out = os.path.join(ROOT, "build")
+    out = build_dir()
     os.makedirs(out, exist_ok=True)
     zig = [sys.executable, "-m", "ziglang"]
     elf, binf = os.path.join(out, "hook.elf"), os.path.join(out, "hook.bin")
     ld = os.path.join(out, "link.ld")          # src/link.ld with the variables' address filled in
     open(ld, "w").write(open(os.path.join(ROOT, "src", "link.ld")).read().replace(
         ". = BSS_ADDR;", ". = 0x%X;" % (BLOB_ADDR + BLOB_RESERVE)))
-    subprocess.check_call(cwd=ROOT, args=zig + [
+    subprocess.check_call(cwd=out, args=zig + [   # cwd: map_art.c .incbin's map_art.lz from it
         "cc", "-target", "arm-freestanding-eabi", "-mcpu=arm946e_s", "-marm",
         "-Os", "-g", "-ffreestanding", "-nostdlib", "-fno-pic", "-fno-builtin",
         "-Wall", "-Wl,-T," + ld] +
@@ -182,7 +188,8 @@ def main():
     art = (side or vert) and not args.no_map_art and os.path.exists(args.map_art)
     if art:
         data = open(args.map_art, "rb").read()
-        open(os.path.join(ROOT, "build", "map_art.lz"), "wb").write(data)
+        os.makedirs(build_dir(), exist_ok=True)
+        open(os.path.join(build_dir(), "map_art.lz"), "wb").write(data)
         # zig caches the compile, and the .incbin'd art is not part of its key: the art's
         # checksum goes into the command line, so other art is always compiled in
         art = zlib.crc32(data) & 0x7FFFFFFF | 1
