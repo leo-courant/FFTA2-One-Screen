@@ -1,0 +1,162 @@
+# What the mod has learned about game addresses (ARM9 RAM, US ROM).
+# kind: func = function entry (name shows in work/decomp/slim/ as name_<addr>),
+#       site = an instruction the mod patches or hooks, data = a RAM word or table.
+# Names are ours, not the game's. "itcm" = runs from ITCM, not in the decompile.
+# Add a line whenever a session pins something down, then run scripts/slim_decomp.py.
+address	kind	name	note
+0x02004300	func	vram_bank_release	gives texture banks back to the CPU (VRAMCNT = 0x80) before the game's own uploads; the vblank interrupt's upload queue does so at lines 192 to about 209 and maps them back (0x02003cd4), cutting any upload of the mod's still running (ticket 41)
+0x02003cd4	func	tex_banks_set	maps the texture banks to the 3D engine (bank B = 0x8B); see vram_bank_release
+0x0200523c	func	g3_ortho_w	every orthographic projection goes through here; widescreen squeeze hooks it (ADR 0003)
+0x02005270	site	ortho_fix	hook: scales the projection matrix (blob entry +4); the 2D projection (1 unit = 1 game pixel, x scale 32.0, w 1.0) is also multiplied by 128 so a pixel is a whole number of clip units (ticket 43)
+0x020840a0	func	ui_draw_pass	draws the 2D screen furniture each frame (windows through 0x020532e8, layout trees, covers) under the 2D projection: G3_OrthoW top 0, bottom 192, left 0, right 256 (in 1/4096 units, so 1 unit = 1 game pixel), stored at the pointer 0x0203c118 returns; pieces are placed with MTX_TRANS plus a quad of their size (ticket 43)
+0x02007f44	data	arena_lo_literal	literal holding the main heap start; patch.py moves it up by BLOB_RESERVE
+0x0201ea60	site	hook_entry	tail of the per-frame key update; the mod's frame_hook runs from here (ADR 0001)
+0x0201e274	site	swap_stub	call to the swap-buffers routine; banner and turn-order quads are issued here
+0x01ffb51c	func	swap_buffers	itcm; the game's swap-buffers routine
+0x01ff8628	func	sprite_list_send	itcm; sends prebuilt sprite command lists (units, weather icon), positions baked in
+0x01ffcf3c	data	sprite_queue_ptr	pointer to the sprite queue filled by sprite_queue_add
+0x0204b514	site	text_line_stub	text line placement hook
+0x0204d4b4	site	text_draw_site	text drawn relative to its object's matrix (follows moved panels by itself)
+0x0204f944	func	window_draw_speech	speech / dialogue window
+0x0204fffc	func	window_draw_other	third window kind
+0x0204e4ac	func	window_frame_draw	draws any window's frame: 3x3 pieces of 0x28 bytes from window +0x18 (+0 used, +1 x, +2 y, +5 w, +6 h, bytes; then texture coordinates), origin x, y at +0x10, scale at +0x1A8 (ticket 37)
+0x020525e8	func	window_draw	common window
+0x02053320	site	window_speech_call	call to window_draw_speech, wrapped by the mod
+0x0205332c	site	window_other_call	call to window_draw_other, wrapped by the mod
+0x02053338	site	window_call	call to window_draw, wrapped by the mod
+0x02034164	func	sprite_queue_add	queues a 0xA0-byte sprite entry (clip matrix at +0x14, read back from GX)
+0x02034c5c	site	sprite_stub	sprite_fix: moves a sprite sitting on a small moved top panel
+0x02084844	func	res_slot_of	file id -> resource slot (0..46) of the table at 0x0212E4E8
+0x02084af8	func	res_load	(owner, file, 1, ?) loads a file into its resource slot: +0 owner, +8 handle, +0xC size, +0x10 buffer
+0x02084d38	func	res_unload	frees a resource slot (via 0x02084CA0)
+0x0208b0bc	func	map_cell_visible	map-cell visibility test; replaced by a version with side margins (ticket 04)
+0x0208ce08	site	map_stub	end of the map routine; map_extend draws a map's edge pixels out to the screen edge
+0x0208fac0	func	camera_xy	camera position query used by the backdrop bands
+0x020a0e74	func	vram_scene_setup	sets the VRAM areas per scene mode (r0); mode 2/3 = battle: texture heap 0x2E000 size 0x12000 and palette heap 0 size 0x800; modes 4-8,10 give a texture palette area 0x2E00-0x3FFF (ticket 07)
+0x020a0f68	site	battle_tex_heap_size	`mov r2, #0x12000` in vram_scene_setup (not patched: the mod shares the heap's top instead, ADR 0008)
+0x020b095c	site	layout_piece_stub	per-piece hook inside the layout object draw
+0x020b0734	func	layout_piece_draw	draws one layout piece as a textured quad; scratch quad in r8 (texcoords 20.12 at words 0/1,3/4,6/7,9/10, positions as shorts at +8/+0x14/+0x20/+0x2C)
+0x020b0b4c	site	still_stub	END_VTXS of a layout piece's quad; still_edges adds the mirrored edges of a full-screen still picture (ticket 12)
+0x020b145c	site	layout_clip_checks	0x020b145c-0x020b1474: on-screen bounds tests for layout pieces, widened by patch.py
+0x020b2e98	site	layout_obj_stub	layout object hook: r0 = parent matrix (translation words 9/10), r8 = y
+0x020b2ff0	func	layout_tree_draw	draws a layout object tree; children get the parent's finished 4x3 matrix from 0x44-byte slots
+0x020b3208	func	grid_list_layout	grid list widget; cell width +0x94, columns +0x9E, own width +0x20 (ticket 22)
+0x020b34c0	site	list_fix_call	call to grid_list_layout; list_fix narrows the column pitch first
+0x020d4be0	func	scene_layer_draw	draws a scene's picture layers (clouds, menu floor); layer scroll offset at +0xC
+0x020d5364	site	backdrop_height	backdrop band height constant (0xc0), patched taller
+0x020d5368	site	backdrop_width	backdrop band width constant (0x100), patched wider
+0x020d54ac	site	backdrop_camera_call	call to camera_xy for the backdrop bands, wrapped by backdrop_camera
+0x020d60c0	site	layer_draw_call	call to scene_layer_draw, wrapped by layer_draw
+0x02124104	data	word_02124104	2 in battle and in menus; 1 after some battles' "Complete!" but stays 2 in others, so no battle signal (ticket 40); meaning unknown
+0x0212418c	data	sub_scene_word	1 on the world map and its top menus, 2 in anything entered from there
+0x02128f50	data	projection_matrix	current projection matrix, units pixels/4096
+0x02129fe8	data	unit_klesta	battle 1 unit struct of Klesta; unit structs are 0x11C bytes, HP at +0
+0x0212e4e8	data	res_table	resource slots, 47 x 0x20 bytes; info screen sheet pictures load here (ticket 32)
+0x0212e808	data	res_slot25_owner	resource slot 25 +0 (owner arg of res_load); 5 while the ability sheet (file 0x1E) is loaded: View Abilities, Set Abilities
+0x0212e834	data	res_slot26_size	resource slot 26 +0xC, non-zero while the item sheet (file 0x1F) is loaded: Item Info, and Set Abilities as its second picture (ticket 32)
+0x021326d4	data	jobs_list_word	== 3 while the Change Jobs list is up
+0x02143e20	data	mod_blob	old main heap start; the mod's code blob is loaded here (third autoload section); its variables follow at 0x0214BE20 (ADR 0017)
+0x0215b000	data	game_heaps	the game's ten NNS expanded heaps ("EXPH" heads) sit at fixed addresses from here to 0x02340000, whatever the heap start literal says; 0x02143E20-0x0215B000 is never used by the game (scripts/heap_free.py, ADR 0017)
+0x0212f048	data	battle_tex_heap	pointer to the battle texture heap record { start, size, free list, used list }; nodes { prev, next, start, size } (ADR 0008)
+0x020a23b8	func	tex_heap_alloc	battle texture heap: first free block that fits, carved from its front
+0x020a2458	func	tex_heap_alloc_exact	battle texture heap: first free block of exactly the size
+0x020a24f8	func	tex_heap_free	battle texture heap: moves a used block back to the free list
+0x02085864	func	list_append	appends a node { prev, next, ... } to a linked list
+0x0201eac8	func	keys_held	returns the held-buttons word (DS key bits, 1 = down)
+0x0201ed70	func	soft_reset_combo	counts calls with held == exactly 0x30C (L+R+START+SELECT); 1 after 10 in a row
+0x0201edbc	func	soft_reset_check	runs the reset when soft_reset_combo fires, unless its block's byte +1 (reset disabled) is set
+0x02127D00	data	battle_obj_ptr	non-zero (a pointer into the battle heap) from a battle's opening scene to the end of its results, 0 on the world map and in its menus; checked on 57 test screens, battles 1 and 2 (ticket 08)
+0x0212418C	data	scene_word	1 or 2; NOT a battle signal: 2 in battles and menus, and also on the world map after a battle
+0x020f9778	func	dual3d_start	two-screen 3D (a Scion's animation, effect ids 0x152-0x15E, nothing else): sets dual3d_state+0x18 = 1, starts a task running dual3d_task (ticket 26)
+0x020f8edc	func	dual3d_task	zooms the camera out to fit the whole map, fades to black, photographs the battlefield by display capture, sets dual3d_state+4, starts the effect, then restores the battle (ticket 26)
+0x020f94f8	func	dual3d_frame	per frame (vblank) while dual3d_state+0x18: odd frames show the bottom screen's camera, even ones the top's (POWCNT1 bit 15), each captured as 12/16 new + 8/16 old (weights at 0x02131BEC +0x48/+0x49) and shown through VRAM display (ticket 26)
+0x02131bb8	data	dual3d_state	+0x18 mode on (lead-in included), +4 two-screen picture running, +0x14 frame parity, +0x10 2D variant 0-4 (always 0 for the Scions), +0 effect id, +8 effect handle (ticket 26)
+0x020b1460	site	layout_clip_y_max	one of the layout piece bounds tests (see layout_clip_checks), widened by patch.py
+0x020b146c	site	layout_clip_x_min	one of the layout piece bounds tests (see layout_clip_checks), widened by patch.py
+0x020b1474	site	layout_clip_y_min	one of the layout piece bounds tests (see layout_clip_checks), widened by patch.py
+0x02083330	func	save_base	returns the save data base (0x0212B0A0 in RAM); event flags at +0x2694, scene state at +0x2674 (ticket 24)
+0x0208a674	func	bit_test	(bytes, bit) -> bit set; the game's generic bit-array test
+0x020d0bf8	func	event_flag_test	event flag N of the field at 0x0212D734 (wraps bit_test); log its r0 to see what a screen checks (ticket 24)
+0x020d0c20	func	event_flag_set	event flag N set/clear
+0x020d0c50	func	event_var_get	event variable N, bytes at 0x0212D834 (flag field + 0x100)
+0x020d0c78	func	event_var_set	event variable N = value
+0x020d3a48	func	story_state	returns 0x0212D714 (save base + 0x2674): u16 story progress (event command 0x35 sets it), +4 mode byte, +7 count and +8 u16 queue of next scenes (ticket 24)
+0x0212d734	data	event_flags	event flag bit field: 0x4C bazaar in shops, 0x51-0x64 world-map areas, 0x2E0-0x4DF missions posted, 0x4E0-0x569 world-map places, 0x58E-0x593 change on accepting a mission (setting them restarts the opening), 0x71C+ clan privileges (ticket 24)
+0x0212d834	data	event_vars	event variable bytes: 0x15 (0x0212D849) counts story steps (2, 3, 4 in the first hour), 0xAA-0xBC area control (0x20 = controlled), 0xC3 (0x0212D8F7) auction month
+0x0212db34	data	quest_states	4 bytes per quest, 0x1FB quests; byte 0: 0x13 accepted, 0x2D completed
+0x020d3a5c	func	story_progress_get	u16 story progress at 0x0212D714: 90 on the first world map; story quests need 20-1290 (ticket 24)
+0x020f3124	func	quest_offerable	quest N can be offered: progress >= record +4, event flag record +6, event var record +8 >= +10, month +0xB, day +0xC, ability +0xE
+0x020cb288	func	quest_record	quest N's 100-byte record (sysdata file 11): +0 type (1 story, 2 side, 3 overworld encounter, 4 clan trial, 5 follow-up), +2 rank, +4 story requirement, +0x21 place, +0x22 battlefield (the map), +0x23 its map group (must match the battlefield, or a fallback room loads; ticket 24)
+0x0212d714	data	story_progress	u16 story progress (see story_progress_get); the late test save sets 1240 (ticket 24)
+0x02163925	data	map_hover_place	world map: id of the place under the cursor (overlay memory; seen in the Galerria Deep area, ids 101-111)
+0x020cac64	func	auction_season_day	per new day: auction houses open while the month equals event variable 0xC3 (the auction month), flag at +0xA1 bit 3 of FUN_020E89A0's struct (ticket 24)
+0x020ef40c	func	day_of_year	byte at FUN_02083348() + 0x40: day of year 1..240; month = (d-1)/20+1 (0x020EF450), day of month 0x020EF41C
+0x0208f96c	func	sprite_queue_draw	draws the whole sprite queue each frame: calls ITCM 0x01FFB390 with the projection matrix
+0x0208f97c	site	queue_stub	queue_widen: a full-screen sprite picture (story scene backdrop) is widened to the real edges (ticket 29); the bar of the law and objective announcements is carried on to the right edge (ticket 39)
+0x01ffb390	func	sprite_queue_send	itcm; walks the sprite queue (0xA0-byte ready GX command lists) and sends each
+0x01ffbc70	site	sprite_entry_copy	itcm; copies a prepared sprite command list into a queue entry (story backdrop quads are made this way, not by sprite_queue_add)
+0x0201fa3c	func	archive_lookup	path -> offset/size in master/pc.bin through the hash index pc.idx (hash h*37+c); scripts/pcbin.py does the same (ticket 29)
+0x0201fe38	func	archive_open	opens a file of master/pc.bin by path
+0x0201fce4	func	pak_open	opens entry N of a .pak through its _rom.idx table (6-byte records, offset/4 in bits 3..26)
+0x02093964	func	event_load	loads event N (story scene) from ev_all.pak (folder event/rom), and battle script M from btscr_all.pak (ticket 29)
+0x020991d4	func	event_script_start	starts script k of the loaded event: base = table + table[k] (table pointer at 0x0212EF38+0x10)
+0x0209c888	func	event_interp	event script interpreter: u16 opcode, {length, handler} table at 0x0211A33C, 185 opcodes
+0x0209d9b4	func	evcmd_play_effect	event opcode 0x38 (6 bytes): kind byte, u16 effect number, byte; kind 1 = effect/event/eNNN.efx
+0x02049dac	func	effect_file_open	builds an effect path from (kind, number) and opens it: 0 c_all.efx, 1 effect/event/e%03u.efx
+0x02031dbc	func	effect_sprite_draw	effect renderer that puts effect quads into the sprite queue (via ITCM 0x01FFBC70)
+0x0212d716	data	story_scene	u16 at story state +2; with +0x14 (quest row), +0x18 (event before the battle), +0x1A (event after) it picks the event FUN_02093ACC loads (ticket 29)
+0x02093acc	func	event_load_current	loads the current story event: story state +0x18 or +0x1A by its argument, then FUN_02093964
+0x0212d9a6	data	battle_law	event variable 0x172: the battle's one law, 1-71 = the law text list (message 14000 + law); 10 in the tutorial, 1 in battle 2. Set only by law_announce, read only by info_law_priv_setup (ticket 09)
+0x0212d9a5	data	battle_privilege_var	event variable 0x171: set when the clan privilege is picked (1 for the first privilege in battle 2); read in several battle functions; meaning beyond that unchecked (ticket 09)
+0x020db480	func	law_announce	the screen that announces the battle's law: its law id at +0xB8 (one word); at 0x020DB7C4 stores it in event variable 0x172 and sets event flag 0x654 + law (ticket 09)
+0x02098e10	func	info_law_priv_setup	info screen: law message = 14000 + event variable 0x172, privilege message = 15000 + FUN_020BD260(); each shown only if its bit (13 law, 14 privilege) is set in the battle word from thunk_FUN_0208333c; one law and one privilege, no list (ticket 09)
+0x020a9c48	func	info_law_priv_post	stores { u16 law message, u16 privilege message, u8 flags } at 0x021301EC and starts the task at 0x020A9950 that draws them (ticket 09)
+0x020af834	func	info_law_line_draw	draws the info screen's one law line (seen at text rows 3-4); takes the message only, no position (ticket 09)
+0x020af900	func	info_privilege_line_draw	draws the info screen's privilege line (seen at text rows 6-7); called independently of the law line, with no position, so it should not move up when there is no law (unseen) (ticket 09)
+0x0201d6f8	site	dual3d_frame_call	call of dual3d_frame, wrapped by dual_frame (ticket 26)
+0x020e847c	site	glow_affine_call	effect kind 0xE (round glow on BG3): call that sets the layer's scale and place; glow_stub (ticket 26)
+0x020e81fc	site	glow_blend_call	the same glow's BLDCNT/BLDALPHA setup; glow_blend_stub (ticket 26)
+0x020e81bc	func	effect_glow_draw	effect kind 0xE: a 128x128 256-colour picture on main BG3, added to the 3D; object +0x20C its weight (ticket 26)
+0x020d5a8c	data	backdrop_zoom_width	backdrop band width while the camera is zoomed out (20.12, 0x101000), patched wider (ticket 26)
+0x020d5430	site	backdrop_zoom_height	backdrop band height while zoomed out (mov r0, #0xc1000), patched taller (ticket 26)
+0x027e1274	data	sprite_projection	dtcm; stored projection sprites are queued with (built once at boot through G3_OrthoW)
+0x027e10b4	data	sprite_projection_top	dtcm; the same for the top screen in two-screen 3D, used by nothing else (ticket 26)
+0x020a082c	func	scene_projection	builds the 3D scene's projection; in two-screen 3D top y 0xC00..0x2400 on even frames, -0xC00..0xC00 on odd (one continuous view; ticket 26)
+0x020242f0	func	effect_load	loads an effect by id; ids 0x152-0x15E (the Scions) return -1 = play in two-screen 3D
+0x0202443c	func	effect_play	plays a loaded effect; handle -1 = dual3d_start
+0x020cb14c	func	ability_effect_record	ability N's 0x18-byte record (sysdata file 5): +0 effect id; abilities 0x289-0x295 are the 13 Scions, 0x37 Cure
+0x020f8eac	func	dual3d_playing	the Scion effect is playing (state 3)
+0x02090b20	func	camera_fit_map	zooms the camera out so the whole map fits the 4:3 screen (a Scion's lead-in)
+0x020e7fd8	site	glow_layers	the glow's start switches main BG layers (DISPCNT); glow_layers_stub (ticket 26)
+0x02139158	data	auction_powcnt_lit	overlay 4 (auction, loads at 0x02132FC0): literal word holding POWCNT1's address; three more at 0x0213978C, 0x0213CB60, 0x0213DC54. Bidding sets bit 15 through them (3D engine on the info screen) and clears it between rounds, for the Retire question (0x0213CB60) and at the end; the mod points them at 0x0213E0B6, spare bytes after the overlay's last string (ADR 0015)
+0x02093a8c	func	quest_setup	sets up a quest battle: (quest, scene row (sysdata file 10), record (file 11)); stores the quest at 0x0212EF58, copies the row (its +0 = unit set) to story state +0x14 and the record via 0x020BCAE0 (ticket 38)
+0x02091de4	func	quest_start	starts a quest's scene and battle: case 8 from the world map (dispatcher 0), 0xC chained from the last battle (dispatcher 1); quest record +3 bit 7 = chained, no arrival (ticket 38)
+0x020bcae0	func	battle_setup_record	copies the fields of a quest record the battle uses: +0x22 battlefield, +0x24..+0x28, +0x25/+0x26 = 3/2 for quests 18 and 23 (mist over the map), +3 bit 7 (ticket 38)
+0x020cb248	func	quest_scene_row	quest N's 8-byte row (sysdata file 10): u16 unit set, battle script, event before, event after (ticket 38)
+0x020d3a80	func	scene_queue_push	puts a script number in the story state's queue of scripts to run (+7 count, +8 list); event opcode 0x22 (ticket 38)
+0x0212ee26	data	battle_phase	byte, the battle phase set by event opcode 0x23 (via 0x020894F8): seen on screen: 4 objective, 5 law, 2 placement, 7 "Complete!" (or failed), 0x0A results and law bonus, 0x0F game over; 9 outside battles; 6 and 8 also come in the opening (not looked at); 0 while fought and in between, so it is no "won" signal by itself (ticket 40)
+0x0212ef07	data	battle_outcome	byte, the battle's outcome: 0 fought, 1 won, 2 lost; set by battle_outcome_check, cleared by event opcode 0x11 (all 354 battle-opening scripts) and on resuming a Quick Save (ticket 40)
+0x0209177c	func	battle_outcome_get	returns the byte at 0x0212EF07
+0x0209176c	site	battle_outcome_set	sets the byte at 0x0212EF07; event opcode 0x11 calls it with 0 at 0x0209CF78
+0x02091c6c	func	battle_outcome_check	win check after each turn: outcome 2 if event flag 0x61A or no ally left, 1 if event flag 0x61B or (by the record's win type) no enemy or no target left; else 0 (ticket 40)
+0x020894f8	func	battle_phase_set	stores the battle phase byte
+0x02089508	func	battle_phase_get	returns the battle phase byte
+0x0209d348	func	evcmd_battle_phase	event opcode 0x23 (3 bytes): sets the battle phase and starts its screen via 0x02095870
+0x0204cdf4	func	glyphs_draw	draws a label's letters; with bit 0 of its +0x20 set, each letter twice: a copy at (+1,+1), 100 units further back, then the letter (both from the same texture and palette)
+0x0204cf84	site	label_shadow_1	`cmp r0, #1` on the second-copy flag (letter by letter path); label_stub drops the copy except on the world map's place name (ticket 34)
+0x0204d19c	site	label_shadow_2	the same test in the whole-line path (ticket 34)
+0x020d50e4	site	layer_cull_right	scene_layer_draw's culling of layer parts on maps with clip areas: right bound 256, patched wider (ticket 30)
+0x020d50fc	site	layer_cull_bottom	the same, bottom bound 192
+0x020d5114	site	layer_cull_left	the same, left bound (three instructions)
+0x020d5128	site	layer_cull_top	the same, top bound (three instructions)
+0x02090f08	func	map_has_clip	true on a map with clip areas ("CLIP" data at map +0x108; the mist maps of quests 18, 23, 24): layers are culled and cut, effects are cut around windows (ticket 30)
+0x02031ee0	site	mist_holes_call	effect renderer's fetch of the window rectangles (0x020573B0), replaced by mist_holes: moved as the mod moved the windows (ticket 30)
+0x020573b0	func	window_rects	list of up to 3 rectangles of windows on screen, inset (0x021299F4, count byte 0x021299E8; filled by 0x02053350 and, for layout pieces, 0x020573DC); the effect renderer works on a copy at 0x02129A0C (ticket 30)
+0x0208817c	func	screen_cover	draws a cover over the whole picture: 1 white, 2 black, 3 black half, else red; 256x192 at 0,0 (ticket 30)
+0x020881b0	site	screen_cover_x	cover's x, patched in place of redundant colour stores
+0x020881c0	site	screen_cover_size	cover's width, height and y, patched in place of redundant colour stores
+0x02085df8	func	draw_rect	draws one rectangle from a description: x, y shorts, z, w and h at +0xC (20.12), four colours, alpha (ticket 30)
+0x0212ea88	data	bazaar_word	== 5 from the bazaar's recipe list until the bazaar is left, 0 in every other menu seen (ticket 33)
+0x0204ebe0	func	choice_marks_draw	draws a Yes/No box's marks and cursor at its text lines' stored x/y (0x0204CB50, 0x0204CD80); called by the window drawers (ticket 33)
+0x0204cb50	func	text_line_x_of	text line list (head via the word at 0x0204CB80; node: next +4, id +8, x +10, y +12): x of the line with id r0
+0x0204cd80	func	text_line_y_of	y of the text line with id r0 (list head via the word at 0x0204CDB0); only caller choice_marks_draw

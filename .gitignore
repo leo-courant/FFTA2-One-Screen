@@ -1,0 +1,16 @@
+# copyrighted game data and anything derived from it
+rom/
+unpacked/
+work/
+states/
+shots/
+preview/
+build/
+*.nds
+*.sav
+*.dsv
+.venv/
+__pycache__/
+prototype/*.png
+prototype/*.html
+dist/

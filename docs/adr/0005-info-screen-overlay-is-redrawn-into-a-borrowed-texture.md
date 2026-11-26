@@ -1,0 +1,13 @@
+# The info screen overlay is redrawn in software into borrowed texture memory
+
+Menus where the info screen describes what is selected on the gameplay screen (party, equipment, shop) show that content as a translucent panel on the gameplay screen. To be sharp in widescreen it has to be a texture on a 3D quad (ADR 0003), and the DS cannot hand one engine's picture to the other, so the mod redraws the info screen itself: four 16-colour tile layers plus sprites, composited a few tile rows per frame into a 256-colour texture (about 10 refreshes a second). We chose a full redraw over copying text only because the panels, bars and numbers on these screens are sprites, so there is no text-only subset worth showing.
+
+The texture lives in the upper 48 KB of texture bank A, which the menus do not reference; its previous contents are parked in the unused main-engine BG bank while the overlay is up and restored when it closes. The mod's code reserve grew from 8 KB to 16 KB for the compositor's byte tables, because byte writes to video memory are dropped.
+
+## Consequences
+
+- A screen that really uses the upper half of bank A (the world map does) shows wrong textures behind the overlay while it is open; they come back when it closes.
+- Writes to texture memory must not straddle the moment the 3D engine picks textures up for a frame (scanline 215 in melonDS), or that bank is missing from the whole frame. All overlay writes wait out that window.
+- Savestates made before the reserve grew cannot run this build; they have to be regenerated.
+- Checked with `scripts/vram_guard.py` (ticket 25) over every test state and menu walk. The claims above hold for the early-game menus, the late-game shops, party screens, the map of Ivalice and auctions. They do not hold everywhere. Late-game pub menus draw rows of their texture sheet from inside the borrowed 48 KB. Story and after-battle dialogue scenes show main BG1/BG3 from the bank the copy is parked in, so the parked copy appears on screen. The title picture also reaches into the borrowed area. Ticket 31 holds these. The user chose to offer the overlay only in menus (2026-11-24): `info_screen_is_menu` in `hook.c` allows it while every shown info-screen layer is a 16-colour tile layer, which is true of every menu and of no story scene, after-battle dialogue or title across all test states. That removes the story, dialogue and title clashes. The late-game pub menus are fixed by ADR 0013: in scenes with the game's texture heap, the texture now lives in the heap's free top and nothing is parked.
+- Not handled: scrolled or 256-colour info-screen layers, rotated sprites, blending on the info screen. None of the menu screens seen so far use them.
