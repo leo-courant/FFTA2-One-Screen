@@ -38,13 +38,20 @@ the highlighted job sit at the top left:
 ![Before and after: Change Jobs with the stat column on the top screen, then the same stat column at the top left of the one screen, next to the job list](docs/pictures/change-jobs.png)
 
 **Everything else is widened too.** The world map, towns, shops, the bazaar, auctions, story
-scenes and the title screen all fill the wide screen. The Scions' summons, the only animations
-drawn across both screens, play as one tall picture on the one screen.
+scenes and the title screen all fill the wide screen.
 
 ![Before and after: the world map on the DS's bottom screen, then widened to the edges of the one screen](docs/pictures/world-map.png)
 
-*Pictures: left, the unmodified game's two screens (2x); right, the Steam Deck patch at
-1280x800. Both from the same savestate.*
+**The Scions' summons play whole.** They are the only animations the game draws across both
+screens at once. With the mod they play as one tall picture on the one screen:
+
+![Belias's summon: on the DS its picture runs across both screens; with the mod it plays whole on one screen](docs/pictures/belias.webp)
+
+*Pictures: left, the unmodified game on the DS's two screens (2x); right, the Steam Deck patch
+at 1280x800. Each pair comes from the same savestate.*
+
+**See more:** [the before-and-after catalogue](docs/catalogue.md) has 33 more pairs, from
+battles and menus to towns, shops and the late game.
 
 It is made for emulators. Real DS hardware is not supported.
 
@@ -164,6 +171,7 @@ on the code.
 - You must dump the game from a cartridge you own. This project does not provide ROMs, does not
   link to them, and will not help you find them.
 - The patches and the patcher contain only the mod's own code. They don't contain any part of
-  the original game: every release is checked for that automatically. The four pictures above
-  (the original game next to the mod) are the only game images in the repository.
+  the original game: every release is checked for that automatically. The pictures in
+  `docs/pictures/` (the original game next to the mod, shown here and in the
+  [catalogue](docs/catalogue.md)) are the only game images in the repository.
 - The mod's code and documents are under the [MIT License](LICENSE).
