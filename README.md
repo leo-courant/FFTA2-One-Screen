@@ -149,8 +149,8 @@ one of them too, the patcher lists them and writes nothing.
   stats). Tested with *Promise Rewritten* 0.9.7 up to the first battle.
 - **May clash:** mods that change screens, menus or text, or that add code of their own. Text
   mods can also get cut off: the banner and the ability list were sized for the original texts.
-- **Not detectable when patching:** this mod uses 32 KB of the game's main memory and some video
-  memory while the game runs. Another mod that adds code and uses the same memory would break
+- **Not detectable when patching:** this mod uses 64 KB of the game's main memory (from
+  0x02143E20, where the game's heap used to start) and some video memory while the game runs. Another mod that adds code and uses the same memory would break
   in play, not when patching.
 - Apply this mod **last**, and only once.
 
@@ -158,8 +158,13 @@ one of them too, the patcher lists them and writes nothing.
 
 The release files are built from this repository with Python 3, `ziglang` and `keystone-engine`
 (see [Building for another size](docs/setup-guide.md#building-for-another-size), which also makes
-patches for display sizes the release doesn't cover). `scripts/make_release.py` builds every
-release file and refuses the release if any of them contains bytes of the original game.
+patches for display sizes the release doesn't cover), plus one file that isn't in it: the
+extended edges of the map of Ivalice. That art is made from the game's own map picture, so it
+stays out of the repository; [docs/adr/0018](docs/adr/0018-map-of-ivalice-edges-are-ai-extended.md)
+describes how it is made. A build without it is the same mod, except that the map of Ivalice
+shows the game's flat sea at its far left and right. `scripts/make_release.py` builds every
+release file, and refuses the release if the map art is missing or if any file contains bytes
+of the original game.
 How the mod works inside is written up in `docs/adr/`, and `CLAUDE.md` is the guide for working
 on the code.
 

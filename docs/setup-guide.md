@@ -86,9 +86,9 @@ one of them too, the patcher says which ones and writes nothing: the two mods ca
 - **May clash:** mods that change screens, menus or text, or that add code of their own.
   Text mods can also get cut off. The banner and the ability list were sized for the game's
   original texts.
-- **Not detectable when patching:** this mod uses 32 KB of the game's main memory and some
-  video memory while the game runs. Another mod that adds code and uses the same memory would
-  break in play, not when patching.
+- **Not detectable when patching:** this mod uses 64 KB of the game's main memory (from
+  0x02143E20, where the game's heap used to start) and some video memory while the game runs.
+  Another mod that adds code and uses the same memory would break in play, not when patching.
 - Apply this mod **last**, and only once. The patcher refuses a ROM that already has it.
 
 ## 4. Set up the emulator
@@ -244,6 +244,12 @@ whole-number zoom as still shows at least the DS's 192 rows. It accepts views fr
 - `--nudge X,Y` shifts the picture by a fraction of a pixel. Presets carry measured values. A
   custom size starts at 0,0, which looks fine but may leave slightly uneven pixel edges.
   `docs/test-saves.md`, "Display presets", explains how to measure and tune it.
+
+A ROM built from the repository leaves out one thing the release files have: the extended edges
+of the map of Ivalice. That art is made from the game's own map picture, so it isn't in the
+repository (`docs/adr/0018-map-of-ivalice-edges-are-ai-extended.md` describes how it is made).
+Without it, the map of Ivalice shows the game's flat sea at its far left and right; everything
+else is the same. `patch.py` says so when it builds.
 
 For the internal resolution, pick one where the emulator's 3D picture is at least as large as
 your display. Higher is sharper if your device keeps up.
